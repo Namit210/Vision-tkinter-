@@ -1,15 +1,15 @@
-# Vision - Polygon Fence and Sentry Visibility Analyzer
+# Vision - Convex Hull and Sentry Visibility Analyzer
 
-A Python GUI application for placing obstacle and sentry points, forming polygon fences by connecting obstacles in order, and analyzing sentry visibility relative to the fence.
+A Python GUI application for placing obstacle and sentry points, computing convex hulls to create fenced areas, and analyzing sentry visibility relative to the convex hull.
 
 ## Features
 
 - **Interactive Point Placement**: Click on the canvas to place obstacle or sentry points
 - **Point Types**:
-  - **Obstacles** (red): Points connected in order to form a polygon fence
-  - **Sentries** (blue): Points analyzed for visibility outside the fence
-- **Polygon Fence Formation**: Connects obstacle points in the order they were placed to form a fence (supports concave polygons)
-- **Sentry Visibility Analysis**: Uses ray casting algorithm to determine how many sentries can view outside the polygon fence
+  - **Obstacles** (red): Points used to compute the convex hull (fenced area)
+  - **Sentries** (blue): Points analyzed for visibility outside the convex hull
+- **Convex Hull Computation**: Automatically computes the smallest convex polygon enclosing all obstacles
+- **Sentry Visibility Analysis**: Uses cross-product method to determine how many sentries can view outside the convex hull
 - **Point Management**:
   - Edit point coordinates via inline edit button (✎)
   - Delete individual points via inline delete button (✕)
@@ -41,21 +41,21 @@ python3 ui.py
    - Sentries appear as **blue circles** labeled "S1", "S2", etc.
 3. **View in list**: Each placed point appears in the scrollable list on the right
 
-**Important**: Obstacle points are connected in the order you place them to form the fence polygon.
+**Note**: The order of placing obstacles doesn't matter - the convex hull will automatically find the fenced area.
 
-### Computing Polygon Fence
+### Computing Convex Hull
 
-1. **Place obstacles**: Add at least 3 obstacle points in the desired order
-2. **Click "Compute"**: The polygon fence will be drawn by connecting consecutive obstacles with blue lines
+1. **Place obstacles**: Add at least 3 obstacle points
+2. **Click "Compute"**: The convex hull will be drawn as a blue polygon enclosing all obstacles
 3. **View results**: The status display shows three separate lines:
    - **Points**: Total number of points placed
-   - **Fence vertices**: Number of obstacles forming the fence (or special messages for 0/1/2 obstacles)
+   - **Fence vertices**: Number of vertices in the convex hull (or special messages for 0/1/2 obstacles)
    - **Sentries viewing outside**: Count and ratio (format: X/Y where X can see outside, Y total sentries)
 
 **Note**: 
-- The fence is formed by connecting obstacles in insertion order (O1→O2→O3→...→O1)
+- The convex hull is the smallest convex polygon that contains all obstacle points
 - If fewer than 3 obstacles are placed, all sentries are considered to view outside
-- Sentries on the boundary of the fence can also view outside
+- Sentries on the boundary of the convex hull can also view outside
 
 ### Managing Points
 
@@ -81,14 +81,14 @@ python3 ui.py
 1. Click "Save CSV"
 2. A timestamped file is created (e.g., `clicks_20251026_212017.csv`)
 3. The file contains:
-   - Sentry visibility result (if fence was computed)
-   - All points with index, type, x, y coordinates (in insertion order)
+   - Sentry visibility result (if convex hull was computed)
+   - All points with index, type, x, y coordinates
 
 **Load from CSV**:
 1. Click "Load CSV"
 2. Select a previously saved CSV file
-3. All points are loaded in the same order and displayed on the canvas
-4. Click "Compute" to draw the fence
+3. All points are loaded and displayed on the canvas
+4. Click "Compute" to compute the convex hull
 
 ### CSV Format
 
@@ -104,40 +104,45 @@ index,type,x,y
 
 ## Algorithms
 
-- **Polygon Fence**: Consecutive obstacles are connected in insertion order to form a closed polygon
-- **Point-in-Polygon Test**: Ray casting algorithm (even-odd rule) to determine if a point is inside, outside, or on the boundary of a polygon
-  - Works correctly for both convex and concave polygons
-  - Counts ray intersections from the point to the right
-  - Odd intersections = inside, even intersections = outside
-  - Boundary detection via cross-product method with epsilon tolerance
+- **Convex Hull**: Graham's scan algorithm to compute the convex hull of obstacle points
+  - Finds the smallest convex polygon enclosing all obstacles
+  - Uses polar angle sorting from the lowest point
+  - Counter-clockwise traversal with cross-product tests
+- **Point-in-Polygon Test**: Cross-product method for convex polygons
+  - Determines if a point is inside, outside, or on the boundary
+  - Works by checking if the point is on the left side of all edges
+  - Optimized for convex hulls (counter-clockwise vertex order)
 
 ## Project Files
 
-- `ui.py` - Main GUI application (Vision class with trace() method for fence computation)
-- `position.py` - Ray casting algorithm for point-in-polygon testing
+- `ui.py` - Main GUI application (Vision class with trace() method for convex hull computation)
+- `convex_hull.py` - Graham scan algorithm for convex hull computation
+- `position.py` - Cross-product method for point-in-polygon testing (optimized for convex polygons)
 - `README.md` - This documentation
 
 ## Tips
 
-- **Order matters**: Place obstacles in the order you want them connected to form the fence
+- **Order doesn't matter**: Place obstacles anywhere - the convex hull algorithm will find the fenced area
 - Use mouse wheel to scroll through long point lists
 - Edit points to fine-tune coordinates instead of deleting and re-placing
 - Load CSV files to quickly test different configurations
-- The fence automatically clears when you add, edit, or delete points (you need to click "Compute" again)
-- To create a specific fence shape, plan the order of obstacle placement
+- The convex hull automatically clears when you add, edit, or delete points (you need to click "Compute" again)
+- The convex hull will always be a convex polygon, even if you place obstacles in a non-convex pattern
 
 ## Example Workflow
 
-1. Place 5-6 obstacle points in order around the perimeter of a shape
-2. Place 2-3 sentry points (some inside, some outside the expected fence)
-3. Click "Compute" to see the fence and visibility count
+1. Place 5-6 obstacle points scattered around the canvas
+2. Place 2-3 sentry points (some inside, some outside the expected convex hull)
+3. Click "Compute" to see the convex hull and visibility count
 4. Click "Save CSV" to export the configuration
 5. Later, click "Load CSV" to restore and modify the configuration
 
-## Polygon Fence Behavior
+## About Convex Hulls
 
-This application creates a **polygon fence** by connecting obstacles in **insertion order**. This means:
-- The fence can be **concave** (have indentations, L-shapes, star shapes, etc.)
-- The order of placing obstacles determines the fence shape
-- You have full control over the fence geometry
-- The ray casting algorithm correctly handles all polygon types
+A **convex hull** is the smallest convex polygon that encloses all the given points. Think of it like stretching a rubber band around all the obstacle points - it will form a convex shape.
+
+Properties:
+- Always creates a **convex** polygon (no indentations)
+- Uses only the outermost obstacle points as vertices
+- Interior obstacles don't affect the hull shape
+- Represents the minimal fenced area containing all obstacles

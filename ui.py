@@ -4,6 +4,7 @@ import csv
 import datetime
 import os
 from position import point_position
+from convex_hull import convex_hull
 
 
 
@@ -284,8 +285,6 @@ class Vision:
 
 
 	def trace(self):
-		"""Connect obstacle points in order to form a polygon fence and analyze sentry visibility."""
-		# Clear previous polygon drawings
 		if self.hull_ids:
 			for _id in self.hull_ids:
 				self.canvas.delete(_id)
@@ -316,7 +315,7 @@ class Vision:
 			return
 		
 		if len(obstacles) == 2:
-			# Two obstacles - draw a line between them, all sentries can view outside
+			# Two obstacles 
 			x1, y1 = obstacles[0]
 			x2, y2 = obstacles[1]
 			
@@ -336,19 +335,22 @@ class Vision:
 			self.update_status(fence_vertices=2, sentries_viewing=(sentries_outside, len(sentries)))
 			return
 
-		# 3 or more obstacles - create polygon by connecting obstacles in order (close the polygon)
-		polygon = obstacles + [obstacles[0]]  # Close the polygon
+		# 3 or more obstacles - compute convex hull
+		hull = convex_hull(obstacles)
+		
+		# Close the polygon for drawing and testing
+		polygon = hull + [hull[0]]
 
-		# Draw the polygon fence (outline only)
+		# Draw the convex hull (outline only)
 		flat = []
 		for (x, y) in polygon:
 			flat.extend((x, y))
 		poly_id = self.canvas.create_polygon(*flat, outline="blue", fill="", width=2)
 		self.hull_ids.append(poly_id)
 
-		# Draw markers for polygon vertices
+		# Draw markers for hull vertices
 		r = 6
-		for i, (x, y) in enumerate(obstacles, start=1):
+		for i, (x, y) in enumerate(hull, start=1):
 			cid = self.canvas.create_oval(x - r, y - r, x + r, y + r, fill="", outline="blue", width=2)
 			tid = self.canvas.create_text(x + 6, y - 6, text=str(i), anchor="nw", font=("Arial", 9), fill="blue")
 			self.hull_ids.extend([cid, tid])
@@ -363,7 +365,7 @@ class Vision:
 		self.sentries_viewing_outside = (sentries_outside, len(sentries))
 
 		# Update status
-		self.update_status(fence_vertices=len(obstacles), sentries_viewing=(sentries_outside, len(sentries)))
+		self.update_status(fence_vertices=len(hull), sentries_viewing=(sentries_outside, len(sentries)))
 
 	def load_csv(self):
 		"""Load points from a CSV file."""
